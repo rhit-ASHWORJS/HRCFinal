@@ -34,7 +34,7 @@ public class VisualizeSimulation extends JFrame {
 	 */
 	public VisualizeSimulation() {
 		// TODO: change the following to run the simulation on different maps.
-		String filename = "Map200.txt";
+		String filename = "Map203.txt";
 		LinkedList<String> map = new LinkedList<> ();
 	    try {
 	    System.out.println("Using map: " + filename);
@@ -53,7 +53,7 @@ public class VisualizeSimulation extends JFrame {
 	    	System.exit(0);
 	    }	
 	    
-		String filenameT = "Map200T.txt";
+		String filenameT = "Map203T.txt";
 		LinkedList<Position> targetPositions = new LinkedList<> ();
 	    try {
 			File inputFile = new File(filenameT);

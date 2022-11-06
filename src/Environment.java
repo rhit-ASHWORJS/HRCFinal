@@ -16,6 +16,7 @@ public class Environment {
 	private Tile[][] tiles;
 	private int rows, cols;
 	private LinkedList<Block> blocks = new LinkedList<>();
+	private LinkedList<Block> allBlocks = new LinkedList<>();
 	private ArrayList<Robot> robots;
 	private String[][] policy;
 	
@@ -51,6 +52,19 @@ public class Environment {
 			}
 		}
 		this.robots = robots;
+		
+		for(Block b : blocks)
+		{
+			Block current = b;
+			while(current != null)
+			{
+				allBlocks.add(current);
+				current = current.getNextBlock();
+			}
+		}
+		
+		System.out.println(this.blocks);
+		System.out.println(getState());
 	}
 	
 	/* Traditional Getters and Setters */
@@ -205,6 +219,18 @@ public class Environment {
 		return null;
 	}
 	
+	public Block getBlock(int id)
+	{
+		for(Block b : allBlocks)
+		{
+			if(b.getID() == id)
+			{
+				return b;
+			}
+		}
+		return null;
+	}
+	
 	public void removeTarget(int row, int col) {
 		if (isTarget(row, col)) {
 			cleanTile(row, col);
@@ -232,6 +258,34 @@ public class Environment {
 			}
 			b.setPosition(tempP);
 		}
+	}
+	
+	public LinkedList<Predicate> getState() {
+		LinkedList<Predicate> state= new LinkedList<>();
+		if(robots.get(0).getBlock() != null)
+		{
+			state.add(new Holding(robots.get(0).getBlock().toString()));
+		}
+		else
+		{
+			state.add(new Handempty());
+		}
+		
+		for(int i=0; i<blocks.size(); i++)
+		{
+			Block thisBlock = blocks.get(i);
+			state.add(new OnTable(""+thisBlock.getID()));
+			
+			while(thisBlock.getNextBlock() != null)
+			{
+				state.add(new On(thisBlock.getNextBlock().getID()+"", thisBlock.getID()+""));
+				thisBlock = thisBlock.getNextBlock();
+			}
+			
+			state.add(new Clear(""+thisBlock.getID()));
+		}
+		
+		return state;
 	}
 
 }
