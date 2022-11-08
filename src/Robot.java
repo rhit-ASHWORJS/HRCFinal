@@ -8,11 +8,12 @@ import java.util.Scanner;
 import java.util.Stack;
 
 /**
-	Represents an intelligent agent moving through a particular room.	
-	The robot only has one sensor - the ability to get the status of any  
-	tile in the environment through the command env.getTileStatus(row, col).
-	@author Adam Gaweda, Michael Wollowski
-*/
+ * Represents an intelligent agent moving through a particular room. The robot
+ * only has one sensor - the ability to get the status of any tile in the
+ * environment through the command env.getTileStatus(row, col).
+ * 
+ * @author Adam Gaweda, Michael Wollowski
+ */
 
 public class Robot {
 	private Environment env;
@@ -20,199 +21,365 @@ public class Robot {
 	private int posCol;
 	private boolean toCleanOrNotToClean;
 	private Block b;
-	
+
 	private boolean pathFound;
 	private long openCount;
 	private int pathLength;
-	
-	/**
-	    Initializes a Robot on a specific tile in the environment. 
-	*/
+	Queue<Action> actionQueue = new LinkedList<Action>();
 
-	
-	public Robot (Environment env, int posRow, int posCol) {
+	/**
+	 * Initializes a Robot on a specific tile in the environment.
+	 */
+
+	public Robot(Environment env, int posRow, int posCol) {
 		this.env = env;
 		this.posRow = posRow;
 		this.posCol = posCol;
 		this.toCleanOrNotToClean = false;
 		this.b = null;
 	}
-	
+
 	public void init() {
-		
+
 	}
-	
+
 	public Block getBlock() {
 		return this.b;
 	}
-	
+
 	public boolean setBlock(Block b) {
 		if (this.b == null) {
 			this.b = b;
 			return true;
+		} else if (b == null) {
+			this.b = null;
+			return true;
+		} else {
+			return false;
 		}
-		return false;
 	}
-	
+
 	public boolean getPathFound() {
 		return pathFound;
 	}
-	
+
 	public int getPathLength() {
 		// TODO: modify this procedure to return the actual path length.
 		// You will likely have to track it in some counter.
 		return 0;
 	}
-	
-	public int getPosRow() { return posRow; }
-	public int getPosCol() { return posCol; }
-	public void incPosRow() { posRow++; }
-	public void decPosRow() { posRow--; }
-	public void incPosCol() { posCol++; }
-    public void decPosCol() { posCol--; }
-	
-	/**
-	   Returns the next action to be taken by the robot. A support function 
-	   that processes the path LinkedList that has been populates by the
-	   search functions.
-	*/
-	public Action getAction () {
-	    System.out.print("> ");
-	    Scanner sc = new Scanner(System.in); 
-        String name = sc.nextLine(); 
-		if (name.equals("u")) {
-			return Action.MOVE_UP;
-		}
-		if (name.equals("d")) {
-			return Action.MOVE_DOWN;
-		}
-		if (name.equals("l")) {
-			return Action.MOVE_LEFT;
-		}
-		if (name.equals("r")) {
-			return Action.MOVE_RIGHT;
-		}
-		if (name.equals("us")) {
-			return Action.UNSTACK;
-		}
-		if (name.equals("s")) {
-			return Action.STACK;
-		}
-		if (name.equals("pd")) {
-			return Action.PUT_DOWN;
-		}
-		if (name.equals("pu")) {
-			return Action.PICK_UP;
-		}		
 
-		
-		return Action.DO_NOTHING;
-		
+	public int getPosRow() {
+		return posRow;
 	}
+
+	public int getPosCol() {
+		return posCol;
+	}
+
+	public void incPosRow() {
+		posRow++;
+	}
+
+	public void decPosRow() {
+		posRow--;
+	}
+
+	public void incPosCol() {
+		posCol++;
+	}
+
+	public void decPosCol() {
+		posCol--;
+	}
+
+	/**
+	 * Returns the next action to be taken by the robot. A support function that
+	 * processes the path LinkedList that has been populates by the search
+	 * functions.
+	 */
 	
-	private LinkedList<Action> planToActions(LinkedList<Rule> plan)
-	{
-		LinkedList<Action> actions = new LinkedList<>();
-		
-		for(int i=0; i<plan.size(); i++)
+	public Action getAction() {
+		if(!actionQueue.isEmpty())
 		{
-			LinkedList<Position> targets = new LinkedList<>();
-			
-			Rule thisRule = plan.get(i);
-			if(thisRule instanceof PickUp)
+			return actionQueue.poll();
+		}
+		System.out.print("> ");
+		Scanner sc = new Scanner(System.in);
+		String name = sc.nextLine();
+		Action toDo = null;
+		
+		if (name.equals("u")) {
+			toDo = Action.MOVE_UP;
+		}
+		else if (name.equals("d")) {
+			toDo = Action.MOVE_DOWN;
+		}
+		else if (name.equals("l")) {
+			toDo = Action.MOVE_LEFT;
+		}
+		else if (name.equals("r")) {
+			toDo = Action.MOVE_RIGHT;
+		}
+		else if (name.equals("us") || name.contains("unstack")) {
+			toDo = Action.UNSTACK;
+			int indexOfParam = -1;
+			if(name.equals("us"))
 			{
-				Block b = env.getBlock(Integer.parseInt(((PickUp) thisRule).block));
-				targets.add(b.getPosition());
-				LinkedList<Action> path = astar(targets);
-				
-				for(Action a : path)
-				{
-					actions.add(a);
-				}
-				actions.add(Action.PICK_UP);
-			}
-			else if(thisRule instanceof UnStackIt)
-			{
-				Block b = env.getBlock(Integer.parseInt(((UnStackIt) thisRule).block));
-				targets.add(b.getPosition());
-				LinkedList<Action> path = astar(targets);
-				
-				for(Action a : path)
-				{
-					actions.add(a);
-				}
-				actions.add(Action.UNSTACK);
-			}
-			else if(thisRule instanceof StackIt)
-			{
-				Block b = env.getBlock(Integer.parseInt(((StackIt) thisRule).target));
-				targets.add(b.getPosition());
-				LinkedList<Action> path = astar(targets);
-				
-				for(Action a : path)
-				{
-					actions.add(a);
-				}
-				actions.add(Action.STACK);
-			}
-			else if(thisRule instanceof PutDown)
-			{
-				Position robotPos = new Position(posRow, posCol);
-				Position emptyPos = getNearestEmptyPos(robotPos);
-				if(emptyPos==null)
-				{
-					System.out.println("Entire board is full, aborting");
-					return actions;
-				}
-				
-				targets.add(emptyPos);
-				LinkedList<Action> path = astar(targets);
-				
-				for(Action a : path)
-				{
-					actions.add(a);
-				}
-				actions.add(Action.PUT_DOWN);
+				indexOfParam = name.indexOf("us") + 3;
 			}
 			else
 			{
-				System.out.print("Weird rule found");
+				indexOfParam = name.indexOf("unstack") + 8;
+			}
+			
+			if(indexOfParam < name.length())
+			{
+				Position blockPos = null;
+				if(name.charAt(indexOfParam) == '<')
+				{
+					String ss = name.substring(indexOfParam);
+					
+					int posComma = ss.indexOf(',');
+					int posEnd = ss.indexOf('>');
+					
+					String row = ss.substring(1, posComma);
+					String col = ss.substring(posComma+1, posEnd);
+					
+					blockPos = new Position(Integer.parseInt(row), Integer.parseInt(col));
+				}
+				else if(Character.isDigit(name.charAt(indexOfParam)))
+				{
+					String ss = name.substring(indexOfParam);
+					int lastNumeric = 0;
+					for(int i=0; i<ss.length(); i++)
+					{
+						if(Character.isDigit(ss.charAt(i)))
+						{
+							lastNumeric = i;
+						}
+						else
+						{
+							break;
+						}
+					}
+					String id = ss.substring(0, lastNumeric+1);
+					blockPos = env.getBlock(Integer.parseInt(id)).getPosition();
+				}
+				
+				if(blockPos != null)
+				{
+					LinkedList<Action> list = astar(blockPos);
+					for(Action a : list)
+					{
+						actionQueue.add(a);
+					}
+					actionQueue.add(toDo);
+					toDo = Action.DO_NOTHING;
+				}
+			}
+		}
+		else if (name.equals("s") || name.contains("stack")) {
+			toDo = Action.STACK;
+		}
+		else if (name.equals("pd") || name.contains("put down") || name.contains("putdown") || name.contains("put-down")) {
+			toDo = Action.PUT_DOWN;
+		}
+		else if (name.equals("pu") || name.contains("pick up") || name.contains("pickup") || name.contains("pick-up")) {
+			toDo = Action.PICK_UP;
+		}
+		
+		if(toDo != null)
+		{
+			if(!isActionValid(toDo))
+			{
+				System.out.println("I'm sorry, I can't do that");
+				return Action.DO_NOTHING;
+			}
+			else
+			{
+				return toDo;
+			}
+		}
+		else
+		{
+			return Action.DO_NOTHING;
+		}
+	}
+	
+	private boolean isActionValid(Action a)
+	{
+		if(a == Action.MOVE_UP)
+		{
+			if(posRow == 0)
+			{
+				return false;
+			}
+			else
+			{
+				return true;
+			}
+		}
+		if(a == Action.MOVE_DOWN)
+		{
+			if(posRow == env.getRows()-1)
+			{
+				return false;
+			}
+			else
+			{
+				return true;
+			}
+		}
+		if(a == Action.MOVE_LEFT)
+		{
+			if(posCol == 0)
+			{
+				return false;
+			}
+			else
+			{
+				return true;
+			}
+		}
+		if(a == Action.MOVE_RIGHT)
+		{
+			if(posCol == env.getCols()-1)
+			{
+				return false;
+			}
+			else
+			{
+				return true;
 			}
 		}
 		
+		
+		Tile thisTile = env.getTiles()[posRow][posCol];
+		if(a == Action.UNSTACK)
+		{
+			if(b != null)
+			{
+				return false;
+			}
+			return env.isTower(posRow, posCol);
+		}
+		if(a == Action.PICK_UP)
+		{
+			if(b != null)
+			{
+				return false;
+			}
+			if(env.isTower(posRow, posCol))
+			{
+				return false;
+			}
+			return env.isTarget(posRow, posCol);
+		}
+		
+		if(a == Action.STACK)
+		{
+			if(b == null)
+			{
+				return false;
+			}
+			return env.isTarget(posRow, posCol);
+		}
+		if(a == Action.PUT_DOWN)
+		{
+			if(b == null)
+			{
+				return false;
+			}
+			return !env.isTarget(posRow, posCol);
+		}
+		
+		System.out.println("Unrecognized Action");
+		return false;
+	}
+
+	private LinkedList<Action> planToActions(LinkedList<Rule> plan) {
+		LinkedList<Action> actions = new LinkedList<>();
+
+		for (int i = 0; i < plan.size(); i++) {
+			LinkedList<Position> targets = new LinkedList<>();
+
+			Rule thisRule = plan.get(i);
+			if (thisRule instanceof PickUp) {
+				Block b = env.getBlock(Integer.parseInt(((PickUp) thisRule).block));
+				targets.add(b.getPosition());
+				LinkedList<Action> path = astar(targets.get(0));
+
+				for (Action a : path) {
+					actions.add(a);
+				}
+				actions.add(Action.PICK_UP);
+			} else if (thisRule instanceof UnStackIt) {
+				Block b = env.getBlock(Integer.parseInt(((UnStackIt) thisRule).block));
+				targets.add(b.getPosition());
+				LinkedList<Action> path = astar(targets.get(0));
+
+				for (Action a : path) {
+					actions.add(a);
+				}
+				actions.add(Action.UNSTACK);
+			} else if (thisRule instanceof StackIt) {
+				Block b = env.getBlock(Integer.parseInt(((StackIt) thisRule).target));
+				targets.add(b.getPosition());
+				LinkedList<Action> path = astar(targets.get(0));
+
+				for (Action a : path) {
+					actions.add(a);
+				}
+				actions.add(Action.STACK);
+			} else if (thisRule instanceof PutDown) {
+				Position robotPos = new Position(posRow, posCol);
+				Position emptyPos = getNearestEmptyPos(robotPos);
+				if (emptyPos == null) {
+					System.out.println("Entire board is full, aborting");
+					return actions;
+				}
+
+				targets.add(emptyPos);
+				LinkedList<Action> path = astar(targets.get(0));
+
+				for (Action a : path) {
+					actions.add(a);
+				}
+				actions.add(Action.PUT_DOWN);
+			} else {
+				System.out.print("Weird rule found");
+			}
+		}
+
 		return actions;
 	}
-	
-	private Position getNearestEmptyPos(Position origin)
-	{
+
+	private Position getNearestEmptyPos(Position origin) {
 		ArrayList<Position> seenPositions = new ArrayList<Position>();
 		Queue<Position> positionsToSee = new LinkedList<Position>();
 		positionsToSee.add(origin);
-		
-		while(!positionsToSee.isEmpty())
-		{
+
+		while (!positionsToSee.isEmpty()) {
 			Position current = positionsToSee.poll();
-			
-			if(env.getTileStatus(current.getRow(), current.getCol()) == TileStatus.CLEAN)
-			{
+
+			if (env.getTileStatus(current.getRow(), current.getCol()) == TileStatus.CLEAN) {
 				return current;
 			}
-			
+
 			seenPositions.add(current);
-			
+
 			LinkedList<Position> adj = getAdjacent(current);
-			for(Position p : adj)
-			{
-				if(!seenPositions.contains(p))
-				{
+			for (Position p : adj) {
+				if (!seenPositions.contains(p)) {
 					positionsToSee.add(p);
 				}
 			}
 		}
-		
+
 		return null;
 	}
-	
+
 	private static void STRIPS(LinkedList<Predicate> state, LinkedList<Predicate> goals, LinkedList<Rule> plan) {
 		Stack<Object> goalStack = new Stack<>();
 		for (Predicate p : goals) {
@@ -534,57 +701,52 @@ public class Robot {
 		}
 		return false;
 	}
-	
-	
-	public LinkedList<Action> astar(LinkedList<Position> targets) {
+
+	public LinkedList<Action> astar(Position p) {
+		LinkedList<Position> targets = new LinkedList<Position>();
+		targets.add(p);
 		return astarM(targets);
 	}
-	
+
 	public LinkedList<Action> astarM(LinkedList<Position> targets) {
 		PriorityQueue<LinkedList<Position>> paths = new PriorityQueue<LinkedList<Position>>(new comparatorM());
 		targetx = targets.get(0).getRow();
 		targety = targets.get(0).getCol();
-		
+
 		LinkedList<Position> working = new LinkedList<Position>();
-		HashMap<String,ArrayList<Position>> visited = new HashMap<String,ArrayList<Position>>();
+		HashMap<String, ArrayList<Position>> visited = new HashMap<String, ArrayList<Position>>();
 		working.add(new Position(posRow, posCol));
 		paths.add(working);
 		addToMap(working.get(0), targetsVisitedString(working, targets), visited);
 		openCount++;
-		
+
 		LinkedList<Position> solution = null;
-		if(allTargetsVisited(working, targets))
-		{
+		if (allTargetsVisited(working, targets)) {
 			solution = working;
 		}
-		
-		while(solution == null)
-		{
-			if(paths.size()==0)
-			{
+
+		while (solution == null) {
+			if (paths.size() == 0) {
 				System.out.println("I can't do this mate, I checked " + openCount + " routes and they're all bad.");
 				this.pathFound = false;
 				return null;
 			}
-			working=paths.poll();
-			if(allTargetsVisited(working, targets))
-			{
+			working = paths.poll();
+			if (allTargetsVisited(working, targets)) {
 //				System.out.println("AAAAAAAAAAAAAAA");
 				solution = working;
 				break;
 			}
 			String tvs = targetsVisitedString(working, targets);
 //			System.out.println(working.size());
-			LinkedList<Position> newLocations = getAdjacent(working.get(working.size()-1));
+			LinkedList<Position> newLocations = getAdjacent(working.get(working.size() - 1));
 //			System.out.println(newLocations.size());
-			for(Position p : newLocations)
-			{
-				visited.containsKey(tvs);//update visited
-				if(!(visited.containsKey(tvs)))
-				{
+			for (Position p : newLocations) {
+				visited.containsKey(tvs);// update visited
+				if (!(visited.containsKey(tvs))) {
 					visited.put(tvs, new ArrayList<Position>());
 				}
-				if(positionVisited(visited.get(tvs), p))//avoid loops
+				if (positionVisited(visited.get(tvs), p))// avoid loops
 				{
 					continue;
 				}
@@ -594,145 +756,111 @@ public class Robot {
 				openCount++;
 			}
 		}
-		
+
 		return pathToRoute(solution);
 
 	}
-	
-	private String targetsVisitedString(LinkedList<Position> path, LinkedList<Position> targets)
-	{
+
+	private String targetsVisitedString(LinkedList<Position> path, LinkedList<Position> targets) {
 		String tvs = "";
-		for(int i=0; i<targets.size(); i++)
-		{
-			if(pathContainsPosition(path, targets.get(i)))
-			{
+		for (int i = 0; i < targets.size(); i++) {
+			if (pathContainsPosition(path, targets.get(i))) {
 				tvs = tvs + i + ",";
 			}
 		}
 		return tvs;
 	}
-	
-	private boolean allTargetsVisited(LinkedList<Position> path, LinkedList<Position> targets)
-	{
-		for(Position t : targets)
-		{
-			if(!pathContainsPosition(path, t))
-			{
+
+	private boolean allTargetsVisited(LinkedList<Position> path, LinkedList<Position> targets) {
+		for (Position t : targets) {
+			if (!pathContainsPosition(path, t)) {
 				return false;
 			}
 		}
 		return true;
 	}
-	
-	private LinkedList<Position> addToPath(LinkedList<Position> path, Position p)
-	{
+
+	private LinkedList<Position> addToPath(LinkedList<Position> path, Position p) {
 		LinkedList<Position> newPath = new LinkedList<Position>();
-		for(Position p2:path)
-		{
+		for (Position p2 : path) {
 			newPath.add(p2);
 		}
 		newPath.add(p);
 		return newPath;
 	}
-	
-	private void addToMap(Position p, String s, HashMap<String, ArrayList<Position>> map)
-	{
-		if(map.containsKey(s))
-		{
+
+	private void addToMap(Position p, String s, HashMap<String, ArrayList<Position>> map) {
+		if (map.containsKey(s)) {
 			map.get(s).add(p);
-		}
-		else
-		{
+		} else {
 			map.put(s, new ArrayList<Position>());
 			map.get(s).add(p);
 		}
 	}
-	
+
 	private LinkedList<Position> getAdjacent(Position p) {
 		LinkedList<Position> near = new LinkedList<Position>();
-		
-		for(int ymod=-1; ymod<=1; ymod+=2)
-		{
-			int newx=p.getRow();
-			int newy=p.getCol()+ymod;
-			
+
+		for (int ymod = -1; ymod <= 1; ymod += 2) {
+			int newx = p.getRow();
+			int newy = p.getCol() + ymod;
+
 //			System.out.println("Checking: " + newx + "," + newy);
-			
-			if(env.getTileStatus(newx, newy) != TileStatus.IMPASSABLE)
-			{
+
+			if (env.getTileStatus(newx, newy) != TileStatus.IMPASSABLE) {
 				near.add(new Position(newx, newy));
 			}
 		}
-		for(int xmod=-1; xmod<=1; xmod+=2)
-		{
-			int newx=p.getRow()+xmod;
-			int newy=p.getCol();
-			
+		for (int xmod = -1; xmod <= 1; xmod += 2) {
+			int newx = p.getRow() + xmod;
+			int newy = p.getCol();
+
 //			System.out.println("Checking: " + newx + "," + newy);
-			
-			if(env.getTileStatus(newx, newy) != TileStatus.IMPASSABLE)
-			{
+
+			if (env.getTileStatus(newx, newy) != TileStatus.IMPASSABLE) {
 				near.add(new Position(newx, newy));
 			}
 		}
-		
+
 		return near;
 	}
-	
-	private boolean positionVisited(ArrayList<Position> visited, Position p)
-	{
-		if(visited == null)
-		{
+
+	private boolean positionVisited(ArrayList<Position> visited, Position p) {
+		if (visited == null) {
 			return false;
 		}
-		for(Position p2:visited)
-		{
-			if(p2.getRow()==p.getRow() && p2.getCol()==p.getCol())
-			{
+		for (Position p2 : visited) {
+			if (p2.getRow() == p.getRow() && p2.getCol() == p.getCol()) {
 				return true;
 			}
 		}
 		return false;
 	}
-	
-	private boolean pathContainsPosition(LinkedList<Position> path, Position p)
-	{
-		for(Position p2:path)
-		{
-			if(p2.getRow()==p.getRow() && p2.getCol()==p.getCol())
-			{
+
+	private boolean pathContainsPosition(LinkedList<Position> path, Position p) {
+		for (Position p2 : path) {
+			if (p2.getRow() == p.getRow() && p2.getCol() == p.getCol()) {
 				return true;
 			}
 		}
 		return false;
 	}
-	
-	private LinkedList<Action> pathToRoute(LinkedList<Position> path)
-	{
+
+	private LinkedList<Action> pathToRoute(LinkedList<Position> path) {
 		LinkedList<Action> route = new LinkedList<Action>();
-		for(int i=0; i<path.size()-1; i++)
-		{
+		for (int i = 0; i < path.size() - 1; i++) {
 			Position current = path.get(i);
-			Position next = path.get(i+1);
-			
-			if(current.getRow()<next.getRow())
-			{
+			Position next = path.get(i + 1);
+
+			if (current.getRow() < next.getRow()) {
 				route.add(Action.MOVE_DOWN);
-			}
-			else if(current.getRow()>next.getRow())
-			{
+			} else if (current.getRow() > next.getRow()) {
 				route.add(Action.MOVE_UP);
-			}
-			else if(current.getCol()<next.getCol())
-			{
+			} else if (current.getCol() < next.getCol()) {
 				route.add(Action.MOVE_RIGHT);
-			}
-			else if(current.getCol()>next.getCol())
-			{
+			} else if (current.getCol() > next.getCol()) {
 				route.add(Action.MOVE_LEFT);
-			}
-			else
-			{
+			} else {
 				route.add(Action.DO_NOTHING);
 			}
 		}
@@ -743,91 +871,75 @@ public class Robot {
 
 		@Override
 		public int compare(LinkedList<Position> o1, LinkedList<Position> o2) {
-			if(o1.size() + getHeuristic(o1) > o2.size() + getHeuristic(o2))
-			{
+			if (o1.size() + getHeuristic(o1) > o2.size() + getHeuristic(o2)) {
 				return 1;
-			}
-			else if(o1.size() + getHeuristic(o1) == o2.size() + getHeuristic(o2))
-			{
+			} else if (o1.size() + getHeuristic(o1) == o2.size() + getHeuristic(o2)) {
 				return 0;
-			}
-			else
-			{
+			} else {
 				return -1;
 			}
 		}
-		
+
 	}
 
 	int targetx = 0;
 	int targety = 0;
-	private double getHeuristic(LinkedList<Position> path)
-	{
+
+	private double getHeuristic(LinkedList<Position> path) {
 		double heu = path.size();
-		//add remaning distance to goal
+		// add remaning distance to goal
 		int goalx = targetx;
 		int goaly = targety;
-		int lastx=path.get(path.size()-1).getRow();
-		int lasty=path.get(path.size()-1).getCol();
-		
-		heu += Math.sqrt(Math.pow(lastx-goalx, 2)+Math.pow(lasty-goaly, 2));
-		System.out.println( heu);
+		int lastx = path.get(path.size() - 1).getRow();
+		int lasty = path.get(path.size() - 1).getCol();
+
+		heu += Math.sqrt(Math.pow(lastx - goalx, 2) + Math.pow(lasty - goaly, 2));
+		System.out.println(heu);
 		return heu;
 	}
-	
-	private Position getClosestPosition(Position src, ArrayList<Position> dests)
-	{
+
+	private Position getClosestPosition(Position src, ArrayList<Position> dests) {
 		Position closest = dests.get(0);
 		double dist = distanceBetweenPositions(src, closest);
-		for(Position p : dests)
-		{
-			if(distanceBetweenPositions(p, src) < dist)
-			{
+		for (Position p : dests) {
+			if (distanceBetweenPositions(p, src) < dist) {
 				closest = p;
 				dist = distanceBetweenPositions(p, src);
 			}
 		}
 		return closest;
 	}
-	
-	private double distanceBetweenPositions(Position p1, Position p2)
-	{
+
+	private double distanceBetweenPositions(Position p1, Position p2) {
 		int dist = 0;
 //		return Math.sqrt(Math.pow(p1.getCol()-p2.getCol(), 2)+Math.pow(p1.getRow()-p2.getRow(), 2));
 		int startx = p1.getRow();
 		int starty = p1.getCol();
 		int endx = p2.getRow();
 		int endy = p2.getCol();
-		
-		int xadj=0;
-		int yadj=0;
-		if(startx>endx)
-		{
-			xadj=-1;
+
+		int xadj = 0;
+		int yadj = 0;
+		if (startx > endx) {
+			xadj = -1;
 		}
-		if(startx<endx)
-		{
-			xadj=1;
+		if (startx < endx) {
+			xadj = 1;
 		}
-		if(starty>endy)
-		{
-			yadj=-1;
+		if (starty > endy) {
+			yadj = -1;
 		}
-		if(starty<endy)
-		{
-			yadj=1;
+		if (starty < endy) {
+			yadj = 1;
 		}
-		
-		for(int x=startx; x!=endx; x+=xadj)
-		{
+
+		for (int x = startx; x != endx; x += xadj) {
 			dist++;
 		}
-		for(int y=starty; y!=endy; y+=yadj)
-		{
+		for (int y = starty; y != endy; y += yadj) {
 			dist++;
 		}
-		
-		
+
 //		return Math.abs(p1.getCol()-p2.getCol())+Math.abs(p1.getRow()-p2.getRow());
 		return dist;
 	}
