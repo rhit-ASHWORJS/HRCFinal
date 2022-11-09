@@ -26,6 +26,8 @@ public class Robot {
 	private long openCount;
 	private int pathLength;
 	Queue<Action> actionQueue = new LinkedList<Action>();
+	Queue<Action> lateActionQueue = new LinkedList<Action>();
+	Queue<Rule> ruleQueue = new LinkedList<Rule>();
 
 	/**
 	 * Initializes a Robot on a specific tile in the environment.
@@ -102,7 +104,41 @@ public class Robot {
 	public Action getAction() {
 		if(!actionQueue.isEmpty())
 		{
-			return actionQueue.poll();
+			Action toDo = actionQueue.poll();
+			if(!isActionValid(toDo))
+			{
+				System.out.println("I'm sorry, I can't " + toDo.toString() + " here");
+				return Action.DO_NOTHING;
+			}
+			return toDo;
+		}
+		if(!ruleQueue.isEmpty())
+		{
+			LinkedList<Rule> miniPlan = new LinkedList<Rule>();
+			miniPlan.add(ruleQueue.poll());
+			LinkedList<Action> actions = planToActions(miniPlan);
+			for(Action a : actions)
+			{
+				actionQueue.add(a);
+			}
+			//---------------------------------------------------
+			Action toDo = actionQueue.poll();
+			if(!isActionValid(toDo))
+			{
+				System.out.println("I'm sorry, I can't " + toDo.toString() + " here");
+				return Action.DO_NOTHING;
+			}
+			return toDo;
+		}
+		if(!lateActionQueue.isEmpty())
+		{
+			Action toDo = lateActionQueue.poll();
+			if(!isActionValid(toDo))
+			{
+				System.out.println("I'm sorry, I can't " + toDo.toString() + " here");
+				return Action.DO_NOTHING;
+			}
+			return toDo;
 		}
 		System.out.print("> ");
 		Scanner sc = new Scanner(System.in);
@@ -136,6 +172,7 @@ public class Robot {
 			if(indexOfParam < name.length())
 			{
 				Position blockPos = null;
+				Block blockToGrab = null;
 				if(name.charAt(indexOfParam) == '<')
 				{
 					String ss = name.substring(indexOfParam);
@@ -147,6 +184,7 @@ public class Robot {
 					String col = ss.substring(posComma+1, posEnd);
 					
 					blockPos = new Position(Integer.parseInt(row), Integer.parseInt(col));
+					blockToGrab = env.getBlock(Integer.parseInt(row), Integer.parseInt(col));
 				}
 				else if(Character.isDigit(name.charAt(indexOfParam)))
 				{
@@ -165,12 +203,158 @@ public class Robot {
 					}
 					String id = ss.substring(0, lastNumeric+1);
 					blockPos = env.getBlock(Integer.parseInt(id)).getPosition();
+					blockToGrab = env.getBlock(Integer.parseInt(id));
+				}
+				
+				if(blockToGrab == null)
+				{
+					System.out.println("Could not find the specified block");
 				}
 				
 				if(blockPos != null)
 				{
-					LinkedList<Action> list = astar(blockPos);
-					for(Action a : list)
+					LinkedList<Predicate> goal = new LinkedList<>();
+					goal.add(new Holding(blockToGrab.getID()+""));
+					
+					LinkedList<Rule> plan = new LinkedList<Rule>();
+					STRIPS(env.getState(), goal, plan);
+					
+					for(Rule r : plan)
+					{
+						ruleQueue.add(r);
+					}
+					toDo = Action.DO_NOTHING;
+				}
+			}
+		}
+		else if (name.equals("s") || name.contains("stack")) {
+			toDo = Action.STACK;
+			int indexOfParam = -1;
+			
+			if(b == null)
+			{
+				System.out.println("I can't stack, I'm not holding anything to stack");
+				return Action.DO_NOTHING;
+			}
+			
+			if(name.equals("s"))
+			{
+				indexOfParam = name.indexOf("s") + 2;
+			}
+			else
+			{
+				indexOfParam = name.indexOf("stack") + 6;
+			}
+			
+			if(indexOfParam < name.length())
+			{
+				Position blockPos = null;
+				Block block = null;
+				if(name.charAt(indexOfParam) == '<')
+				{
+					String ss = name.substring(indexOfParam);
+					
+					int posComma = ss.indexOf(',');
+					int posEnd = ss.indexOf('>');
+					
+					String row = ss.substring(1, posComma);
+					String col = ss.substring(posComma+1, posEnd);
+					
+					blockPos = new Position(Integer.parseInt(row), Integer.parseInt(col));
+					block = env.getBlock(Integer.parseInt(row), Integer.parseInt(col));
+				}
+				else if(Character.isDigit(name.charAt(indexOfParam)))
+				{
+					String ss = name.substring(indexOfParam);
+					int lastNumeric = 0;
+					for(int i=0; i<ss.length(); i++)
+					{
+						if(Character.isDigit(ss.charAt(i)))
+						{
+							lastNumeric = i;
+						}
+						else
+						{
+							break;
+						}
+					}
+					String id = ss.substring(0, lastNumeric+1);
+					blockPos = env.getBlock(Integer.parseInt(id)).getPosition();
+					block = env.getBlock(Integer.parseInt(id));
+				}
+				
+				if(block == null)
+				{
+					System.out.println("Could not find the specified block");
+				}
+				
+				if(blockPos != null)
+				{
+					LinkedList<Predicate> goal = new LinkedList<>();
+					
+					if(block.getNextBlock() != null)
+					{
+						System.out.println("Sorry, but block " + block.getID() + " already has something on it.");
+						return Action.DO_NOTHING;
+					}
+					
+					goal.add(new On(b.getID()+"", block.getID()+""));
+					
+					LinkedList<Rule> plan = new LinkedList<Rule>();
+					STRIPS(env.getState(), goal, plan);
+					
+					for(Rule r : plan)
+					{
+						ruleQueue.add(r);
+					}
+					toDo = Action.DO_NOTHING;
+				}
+			}
+		}
+		else if (name.equals("pd") || name.contains("put down") || name.contains("putdown") || name.contains("put-down")) {
+			toDo = Action.PUT_DOWN;
+			int indexOfParam = -1;
+			
+			if(name.equals("pd"))
+			{
+				indexOfParam = name.indexOf("pd") + 3;
+			}
+			else if(name.contains("put down"))
+			{
+				indexOfParam = name.indexOf("put down") + 9;
+			}
+			else if(name.contains("putdown"))
+			{
+				indexOfParam = name.indexOf("putdown") + 8;
+			}
+			else if(name.contains("put-down"))
+			{
+				indexOfParam = name.indexOf("put-down") + 9;
+			}
+			
+			if(indexOfParam < name.length())
+			{
+				Position blockPos = null;
+				if(name.charAt(indexOfParam) == '<')
+				{
+					String ss = name.substring(indexOfParam);
+					
+					int posComma = ss.indexOf(',');
+					int posEnd = ss.indexOf('>');
+					
+					String row = ss.substring(1, posComma);
+					String col = ss.substring(posComma+1, posEnd);
+					
+					blockPos = new Position(Integer.parseInt(row), Integer.parseInt(col));
+				}
+				
+				if(blockPos != null)
+				{
+					LinkedList<Predicate> goal = new LinkedList<>();
+					
+					LinkedList<Action> path = astar(blockPos);
+					
+					for(Action a : path)
 					{
 						actionQueue.add(a);
 					}
@@ -179,21 +363,222 @@ public class Robot {
 				}
 			}
 		}
-		else if (name.equals("s") || name.contains("stack")) {
-			toDo = Action.STACK;
-		}
-		else if (name.equals("pd") || name.contains("put down") || name.contains("putdown") || name.contains("put-down")) {
-			toDo = Action.PUT_DOWN;
-		}
 		else if (name.equals("pu") || name.contains("pick up") || name.contains("pickup") || name.contains("pick-up")) {
 			toDo = Action.PICK_UP;
+			int indexOfParam = -1;
+			
+			if(name.equals("pu"))
+			{
+				indexOfParam = name.indexOf("pu") + 3;
+			}
+			else if(name.contains("pick up"))
+			{
+				indexOfParam = name.indexOf("pick up") + 8;
+			}
+			else if(name.contains("pickup"))
+			{
+				indexOfParam = name.indexOf("pickup") + 7;
+			}
+			else if(name.contains("pick-up"))
+			{
+				indexOfParam = name.indexOf("pick-up") + 8;
+			}
+			
+			if(indexOfParam < name.length())
+			{
+				Position blockPos = null;
+				Block block = null;
+				if(name.charAt(indexOfParam) == '<')
+				{
+					String ss = name.substring(indexOfParam);
+					
+					int posComma = ss.indexOf(',');
+					int posEnd = ss.indexOf('>');
+					
+					String row = ss.substring(1, posComma);
+					String col = ss.substring(posComma+1, posEnd);
+					
+					blockPos = new Position(Integer.parseInt(row), Integer.parseInt(col));
+					block = env.getBlock(Integer.parseInt(row), Integer.parseInt(col));
+				}
+				else if(Character.isDigit(name.charAt(indexOfParam)))
+				{
+					String ss = name.substring(indexOfParam);
+					int lastNumeric = 0;
+					for(int i=0; i<ss.length(); i++)
+					{
+						if(Character.isDigit(ss.charAt(i)))
+						{
+							lastNumeric = i;
+						}
+						else
+						{
+							break;
+						}
+					}
+					String id = ss.substring(0, lastNumeric+1);
+					blockPos = env.getBlock(Integer.parseInt(id)).getPosition();
+					block = env.getBlock(Integer.parseInt(id));
+				}
+				
+				if(block == null)
+				{
+					System.out.println("Could not find the specified block");
+				}
+				
+				if(blockPos != null)
+				{
+					boolean onTable = false;
+					for(Block other : env.getBlocks())
+					{
+						if(other.getID() == block.getID())
+						{
+							onTable = true;
+						}
+					}
+					if(!onTable)
+					{
+						System.out.println("I cannot pick up a block that is not on table.  Try 'unstack'");
+						return Action.DO_NOTHING;
+					}
+					
+					LinkedList<Predicate> goal = new LinkedList<>();
+					
+					goal.add(new Holding(block.getID()+""));
+					
+					LinkedList<Rule> plan = new LinkedList<Rule>();
+					STRIPS(env.getState(), goal, plan);
+					
+					for(Rule r : plan)
+					{
+						ruleQueue.add(r);
+					}
+					toDo = Action.DO_NOTHING;
+				}
+			}
+		}
+		else if(name.contains("bring"))
+		{
+			try {
+				int indexOfParam = name.indexOf("bring") + 6;
+				Position blockPos = null;
+				Block block = null;
+				if(name.charAt(indexOfParam) == '<')
+				{
+					String ss = name.substring(indexOfParam);
+					
+					int posComma = ss.indexOf(',');
+					int posEnd = ss.indexOf('>');
+					
+					String row = ss.substring(1, posComma);
+					String col = ss.substring(posComma+1, posEnd);
+					
+					blockPos = new Position(Integer.parseInt(row), Integer.parseInt(col));
+					block = env.getTopBlockActually(Integer.parseInt(row), Integer.parseInt(col));
+				}
+				else if(Character.isDigit(name.charAt(indexOfParam)))
+				{
+					String ss = name.substring(indexOfParam);
+					int lastNumeric = 0;
+					for(int i=0; i<ss.length(); i++)
+					{
+						if(Character.isDigit(ss.charAt(i)))
+						{
+							lastNumeric = i;
+						}
+						else
+						{
+							break;
+						}
+					}
+					String id = ss.substring(0, lastNumeric+1);
+					blockPos = env.getBlock(Integer.parseInt(id)).getPosition();
+					block = env.getBlock(Integer.parseInt(id));
+				}
+				
+				Block destBlock = null;
+				Position destPos = null;
+				
+				int indexOfTo = name.indexOf("to")+3;
+				String ss = name.substring(indexOfTo);
+				
+				int posComma = ss.indexOf(',');
+				int posEnd = ss.indexOf('>');
+				
+				String row = ss.substring(1, posComma);
+				String col = ss.substring(posComma+1, posEnd);
+				
+				destPos = new Position(Integer.parseInt(row), Integer.parseInt(col));
+				destBlock = env.getTopBlockActually(Integer.parseInt(row), Integer.parseInt(col));
+				System.out.println(destBlock);
+				
+				if(block.getPosition().equals(destPos))
+				{
+					System.out.println("The block's already there!");
+					return Action.DO_NOTHING;
+				}
+				
+				if(destBlock == null)
+				{
+					LinkedList<Predicate> want = new LinkedList<Predicate>();
+					LinkedList<Rule> plan = new LinkedList<>();
+					want.add(new Holding(block.getID()+""));
+					STRIPS(env.getState(), want, plan);
+					
+					for(Rule r : plan)
+					{
+						ruleQueue.add(r);
+					}
+					
+					int tempx = posRow;
+					int tempy = posCol;
+					
+					posRow = block.getPosition().getRow();
+					posCol = block.getPosition().getCol();
+					
+					LinkedList<Action> path = astar(destPos);
+					
+					for(Action a : path)
+					{
+						lateActionQueue.add(a);
+					}
+					lateActionQueue.add(Action.PUT_DOWN);
+					
+					posRow = tempx;
+					posCol = tempy;
+					toDo = Action.DO_NOTHING;
+				}
+				else
+				{
+					LinkedList<Predicate> want = new LinkedList<Predicate>();
+					LinkedList<Rule> plan = new LinkedList<>();
+//					while(block.getNextBlock() != null)
+//					{
+//						block = block.getNextBlock();
+//					}
+					want.add(new On(block.getID()+"", destBlock.getID()+""));
+					STRIPS(env.getState(), want, plan);
+					
+					for(Rule r : plan)
+					{
+						ruleQueue.add(r);
+					}
+					toDo = Action.DO_NOTHING;
+				}
+			} 
+			catch (Exception E)
+			{
+//				E.printStackTrace();
+				System.out.println("For a 'bring' command, please write 'bring (pos|ID) to <row,col>");
+				return Action.DO_NOTHING;
+			}
 		}
 		
 		if(toDo != null)
 		{
 			if(!isActionValid(toDo))
 			{
-				System.out.println("I'm sorry, I can't do that");
+				System.out.println("I'm sorry, I can't " + toDo.toString() + " here");
 				return Action.DO_NOTHING;
 			}
 			else
@@ -209,6 +594,10 @@ public class Robot {
 	
 	private boolean isActionValid(Action a)
 	{
+		if(a == Action.DO_NOTHING)
+		{
+			return true;
+		}
 		if(a == Action.MOVE_UP)
 		{
 			if(posRow == 0)
@@ -335,14 +724,13 @@ public class Robot {
 			} else if (thisRule instanceof PutDown) {
 				Position robotPos = new Position(posRow, posCol);
 				Position emptyPos = getNearestEmptyPos(robotPos);
+
 				if (emptyPos == null) {
 					System.out.println("Entire board is full, aborting");
 					return actions;
 				}
 
-				targets.add(emptyPos);
-				LinkedList<Action> path = astar(targets.get(0));
-
+				LinkedList<Action> path = astar(emptyPos);
 				for (Action a : path) {
 					actions.add(a);
 				}
@@ -894,7 +1282,6 @@ public class Robot {
 		int lasty = path.get(path.size() - 1).getCol();
 
 		heu += Math.sqrt(Math.pow(lastx - goalx, 2) + Math.pow(lasty - goaly, 2));
-		System.out.println(heu);
 		return heu;
 	}
 

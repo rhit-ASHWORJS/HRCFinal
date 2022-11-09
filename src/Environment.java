@@ -68,6 +68,11 @@ public class Environment {
 				current = current.getNextBlock();
 			}
 		}
+		
+		for(Block b : allBlocks)
+		{
+			System.out.println("Block " + b.getID() + " at position " + b.getPosition().getRow() + "," + b.getPosition().getCol());
+		}
 
 //		System.out.println(this.blocks);
 //		System.out.println(getState());
@@ -80,6 +85,11 @@ public class Environment {
 
 	public int getRows() {
 		return this.rows;
+	}
+	
+	public LinkedList<Block> getAllBlocks()
+	{
+		return this.allBlocks;
 	}
 
 	public int getCols() {
@@ -229,6 +239,22 @@ public class Environment {
 			Position tempP = new Position(row, col);
 			for (Block b : blocks) {
 				if (tempP.equals(b.getPosition()) && b.getNextBlock() == null) {
+					return b;
+				}
+			}
+		}
+		return null;
+	}
+	
+	public Block getTopBlockActually(int row, int col) {
+		if (isTarget(row, col)) {
+			Position tempP = new Position(row, col);
+			for (Block b : allBlocks) {
+				if (tempP.equals(b.getPosition()) && b.getNextBlock() == null) {
+					while(b.getNextBlock() != null)
+					{
+						b = b.getNextBlock();
+					}
 					return b;
 				}
 			}
