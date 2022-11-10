@@ -1,4 +1,5 @@
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -28,6 +29,10 @@ public class Robot {
 	Queue<Action> actionQueue = new LinkedList<Action>();
 	Queue<Action> lateActionQueue = new LinkedList<Action>();
 	Queue<Rule> ruleQueue = new LinkedList<Rule>();
+
+	Position repeatPosition = null;
+	Position repeatDestination = null;
+	Position intPos = null;
 
 	/**
 	 * Initializes a Robot on a specific tile in the environment.
@@ -102,6 +107,66 @@ public class Robot {
 	 */
 	
 	public Action getAction() {
+		if(repeatPosition != null && actionQueue.isEmpty())
+		{
+			if(env.getTileStatus(repeatPosition.getRow(), repeatPosition.getCol()) != TileStatus.TARGET)
+			{
+				if(intPos == null)
+				{
+					repeatPosition = null;
+					repeatDestination = null;
+				}
+				else
+				{
+					repeatPosition = repeatDestination;
+					repeatDestination = intPos;
+					intPos = null;
+				}
+			}
+			else
+			{
+				LinkedList<Action> goToTarget = astar(repeatPosition);
+				
+				int tempx = posRow;
+				int tempy = posCol;
+				
+				posRow = repeatPosition.getRow();
+				posCol = repeatPosition.getCol();
+				
+				LinkedList<Action> returnToDest = astar(repeatDestination);
+				
+				posRow = tempx;
+				posCol = tempy;
+				
+				for(Action a : goToTarget)
+				{
+					actionQueue.add(a);
+				}
+				if(env.isTower(repeatPosition.getRow(), repeatPosition.getCol()))
+				{
+					actionQueue.add(Action.UNSTACK);
+				}
+				else
+				{
+					actionQueue.add(Action.PICK_UP);
+				}
+				for(Action a : returnToDest)
+				{
+					actionQueue.add(a);
+				}
+				if(env.isTarget(repeatDestination.getRow(), repeatDestination.getCol()))
+				{
+					actionQueue.add(Action.STACK);
+				}
+				else
+				{
+					actionQueue.add(Action.PUT_DOWN);
+				}
+			}
+			
+			return Action.DO_NOTHING;
+		}
+		
 		if(!actionQueue.isEmpty())
 		{
 			Action toDo = actionQueue.poll();
@@ -253,7 +318,6 @@ public class Robot {
 					System.out.println(block + " is not a block ID");
 					return Action.DO_NOTHING;
 				}
-				System.out.println(block);
 				a.add(Integer.parseInt(block));
 			}
 			
@@ -296,10 +360,98 @@ public class Robot {
 			toDo = Action.DO_NOTHING;
 		}
 		else if (name.contains("move stack")) {
+			int indexOfParam = name.indexOf("move stack") + 11;
+			String ss = name.substring(indexOfParam);
+			Position blockPos = null;
+			Block block = null;
+				
+			int posComma = ss.indexOf(',');
+			int posEnd = ss.indexOf('>');
 			
+			String row = ss.substring(1, posComma);
+			String col = ss.substring(posComma+1, posEnd);
+			
+			blockPos = new Position(Integer.parseInt(row), Integer.parseInt(col));
+			block = env.getTopBlockActually(Integer.parseInt(row), Integer.parseInt(col));
+			
+			ss = ss.substring(1);
+			ss = ss.substring(ss.indexOf("<"));
+			
+			Position blockPos2 = null;
+			Block block2 = null;
+			
+			posComma = ss.indexOf(',');
+			posEnd = ss.indexOf('>');
+			
+			row = ss.substring(1, posComma);
+			col = ss.substring(posComma+1, posEnd);
+			
+			blockPos2 = new Position(Integer.parseInt(row), Integer.parseInt(col));
+			block2 = env.getTopBlockActually(Integer.parseInt(row), Integer.parseInt(col));
+			
+			if(block == null)
+			{
+				System.out.println("There is no stack there for me to flip!");
+				return Action.DO_NOTHING;
+			}
+			if(block2 != null)
+			{
+				System.out.println("There is already something at the destination!");
+				System.out.println(block2.getID());
+				return Action.DO_NOTHING;
+			}
+			
+			repeatPosition = blockPos;
+			intPos = blockPos2;
+			
+			repeatDestination = getNearestEmptyPos(new Position(posRow, posCol));
+			return Action.DO_NOTHING;
 		}
 		else if (name.contains("flip stack")) {
+			int indexOfParam = name.indexOf("flip stack") + 11;
+			String ss = name.substring(indexOfParam);
+			Position blockPos = null;
+			Block block = null;
+				
+			int posComma = ss.indexOf(',');
+			int posEnd = ss.indexOf('>');
 			
+			String row = ss.substring(1, posComma);
+			String col = ss.substring(posComma+1, posEnd);
+			
+			blockPos = new Position(Integer.parseInt(row), Integer.parseInt(col));
+			block = env.getTopBlockActually(Integer.parseInt(row), Integer.parseInt(col));
+			
+			ss = ss.substring(1);
+			ss = ss.substring(ss.indexOf("<"));
+			
+			Position blockPos2 = null;
+			Block block2 = null;
+			
+			posComma = ss.indexOf(',');
+			posEnd = ss.indexOf('>');
+			
+			row = ss.substring(1, posComma);
+			col = ss.substring(posComma+1, posEnd);
+			
+			blockPos2 = new Position(Integer.parseInt(row), Integer.parseInt(col));
+			block2 = env.getTopBlockActually(Integer.parseInt(row), Integer.parseInt(col));
+			
+			if(block == null)
+			{
+				System.out.println("There is no stack there for me to flip!");
+				return Action.DO_NOTHING;
+			}
+			if(block2 != null)
+			{
+				System.out.println("There is already something at the destination!");
+				System.out.println(block2.getID());
+				return Action.DO_NOTHING;
+			}
+			
+			repeatPosition = blockPos;
+			repeatDestination = blockPos2;
+			return Action.DO_NOTHING;
 		}
 		else if (name.equals("s") || name.contains("stack")) {
 			toDo = Action.STACK;
@@ -879,8 +1031,8 @@ public class Robot {
 		for (Predicate goal : goals) {
 			if (!myContains(state, goal)) {
 				LinkedList<Predicate> newGoals = new LinkedList<Predicate>();
-				newGoals.add(goal);
-				newGoals.addLast(goals.getFirst());
+                newGoals = (LinkedList<Predicate>) goals.clone();
+                Collections.reverse(newGoals);
 				System.out.println("A goal is missing in the initial plan, retrying...");
 				STRIPS(state, newGoals, plan);
 				break;
@@ -947,6 +1099,7 @@ public class Robot {
 				if (item instanceof On) {
 					if (((On) item).bottom.equals(block)) {
 						toPickUp = ((On) item).top;
+						break;
 					}
 				}
 			}
@@ -958,6 +1111,7 @@ public class Robot {
 			for (Predicate item : state) {
 				if (item instanceof Holding) {
 					toDrop = ((Holding) item).block;
+					break;
 				}
 			}
 			goalStack.push(new PutDown(toDrop));
@@ -970,6 +1124,7 @@ public class Robot {
 						goalStack.push(new PickUp(block));
 						goalStack.push(new Handempty());
 						goalStack.push(new Clear(block));
+						break;
 					}
 				}
 				// Checks to see if the desired block to be held is on another block
@@ -978,6 +1133,7 @@ public class Robot {
 						goalStack.push(new UnStackIt(block, ((On) item).bottom));
 						goalStack.push(new Handempty());
 						goalStack.push(new Clear(block));
+						break;
 					}
 				}
 			}
