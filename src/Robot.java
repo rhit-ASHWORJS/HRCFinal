@@ -227,6 +227,80 @@ public class Robot {
 				}
 			}
 		}
+		else if (name.contains("make stack")) {
+			int indexOfParam = name.indexOf("make stack") + 11;
+			ArrayList<Integer> a = new ArrayList<Integer>();
+			String ss = name.substring(indexOfParam);
+			
+			while(ss.contains(","))
+			{
+				int posComma = ss.indexOf(',');
+				
+				String block = ss.substring(0, posComma);
+				ss = ss.substring(posComma+1);
+				
+				boolean bad = false;
+				for(Character c : block.toCharArray())
+				{
+					if(!Character.isDigit(c))
+					{
+						bad = true;
+					}
+				}
+				
+				if(bad)
+				{
+					System.out.println(block + " is not a block ID");
+					return Action.DO_NOTHING;
+				}
+				System.out.println(block);
+				a.add(Integer.parseInt(block));
+			}
+			
+			int lastNumeric = 0;
+			for(int i=0; i<ss.length(); i++)
+			{
+				if(Character.isDigit(ss.charAt(i)))
+				{
+					lastNumeric = i;
+				}
+				else
+				{
+					break;
+				}
+			}
+			String id = ss.substring(0, lastNumeric+1);
+			a.add(Integer.parseInt(id));
+			
+			
+			LinkedList<Predicate> goal = new LinkedList<>();
+			for(int i=0; i<a.size()-1; i++)
+			{
+				goal.add(new On(""+a.get(i+1), ""+a.get(i)));
+			}
+			goal.add(new OnTable(""+a.get(0)));
+//			goal.add(new Clear(""+a.get(a.size()-1)));
+			
+			for(Predicate g : goal)
+			{
+				System.out.println(g);
+			}
+			
+			LinkedList<Rule> plan = new LinkedList<Rule>();
+			STRIPS(env.getState(), goal, plan);
+			
+			for(Rule r : plan)
+			{
+				ruleQueue.add(r);
+			}
+			toDo = Action.DO_NOTHING;
+		}
+		else if (name.contains("move stack")) {
+			
+		}
+		else if (name.contains("flip stack")) {
+			
+		}
 		else if (name.equals("s") || name.contains("stack")) {
 			toDo = Action.STACK;
 			int indexOfParam = -1;
