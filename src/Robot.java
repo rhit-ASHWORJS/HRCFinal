@@ -405,6 +405,14 @@ public class Robot {
 			intPos = blockPos2;
 			
 			repeatDestination = getNearestEmptyPos(new Position(posRow, posCol));
+			
+			if(repeatDestination.getCol() == intPos.getCol() && repeatDestination.getRow() == intPos.getRow())
+			{
+				System.out.println("I can't find a good halfway position to use.  Could you move me to one?");
+				repeatDestination = null;
+				intPos = null;
+				repeatPosition = null;
+			}
 			return Action.DO_NOTHING;
 		}
 		else if (name.contains("flip stack")) {
